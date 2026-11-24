@@ -3,12 +3,14 @@ DESCRIPTOR CALCULATOR, Fg PREDICTOR, AND MODEL REPRODUCIBILITY WORKFLOW
 This folder contains scripts for calculating molecular descriptors, predicting the gas/particle partitioning fraction (Fg) of tobacco-derived semi-volatile organic compounds (TSVOCs), and fully reproducing the model development and validation workflow described in the manuscript.
 
 ========================================================================
-REQUIREMENTS
+REQUIREMENTS & CODE VERSION
 ========================================================================
 Install the required packages:
 pip install -r requirements.txt
 
 (Please refer to requirements.txt for the complete list of software dependencies and their exact versions.)
+
+Code Version: To make the code version clearly identifiable, we have created a specific release tag "v1.0-accepted" on GitHub. This tag permanently locks the exact version of the code used to generate the published results.
 
 
 ========================================================================
@@ -30,9 +32,6 @@ Input:
 Output:
 - A CSV file (default: descriptors.csv) containing all calculated descriptors.
 
-Optional:
-- You can remove constant or near-constant descriptors using the function remove_constant_descriptors in the script.
-
 
 1.2 PREDICT Fg
 -----------------------------------
@@ -49,34 +48,22 @@ The model expects the final descriptors in the following order:
 8. AATS2dv
 9. ATS2dv
 
-An example input file (example_input.csv) is provided. It contains these columns. Column names are ignored; only the order of the first 9 columns matters. You may add extra columns after the first 9; they will be kept in the output but not used for prediction.
+An example input file (example_input.csv) is provided. It contains these columns. Column names are ignored; only the order of the first 9 columns matters.
 
 To predict, run:
 python predict_Fg.py
-
-Then in Python, call:
-from predict_Fg import predict_fg
-predict_fg('example_input.csv')
-
-Or modify the script to call predict_fg directly with your file path.
-
 Output:
 - A CSV file predicted_results.csv with an additional column Predicted_Fg.
-
-Example Input Format:
-MID_h,Boiling Point,Volatility Index,MinPartialCharge,MATS1c,TPSA,BCUTp-1l,AATS2dv,ATS2dv,Compound_Name,CAS
-0.50,200.0,2.50,-0.30,0.10,20.0,0.80,3.20,90.0,Example_1,123-45-6
-1.20,165.0,0.80,-0.15,0.05,10.0,1.20,2.90,83.8,Example_2,234-56-7
 
 
 ========================================================================
 PART 2: COMPLETE MODEL DEVELOPMENT & REPRODUCIBILITY WORKFLOW
 ========================================================================
-To reproduce the model performance and validation statistics reported in the manuscript, run the following three scripts sequentially.
+To reproduce the model performance and validation statistics reported in the manuscript, run the following three scripts sequentially. We have explicitly established a one-to-one correspondence between each script and the reported results.
 
 STEP 1: FEATURE SELECTION (01_feature_selection.py)
 -----------------------------------
-This script reproduces the preprocessing and stability selection to yield the stable candidate descriptors.
+Reproduces: The candidate descriptors.
 - Input File: example_modeling_data_raw.csv
   Requirements: This table should contain the initial molecular descriptors as columns, and the target variable as a specific column (default name in code: example_Fg).
 - Output: 
@@ -85,27 +72,29 @@ This script reproduces the preprocessing and stability selection to yield the st
 
 STEP 2: MODEL COMPARISON (02_model_comparison.py)
 -----------------------------------
-This script evaluates 8 regression models using the candidate descriptors, performs GridSearchCV, and identifies the final descriptors for the best XGBoost model.
+Reproduces: The model comparison results and the final XGBoost model.
 - Input File: dataset_with_Fg_and_descriptors.csv
   Requirements: This table must contain the following exact columns:
   1. Dataset: Values must be labeled as "Train" or "Test" (used to distinguish the training set and the fixed hold-out test set).
   2. SMILES: SMILES strings of the compounds.
   3. Candidate descriptors as columns.
   4. Target column (default name in code: Fg).
+- Note: The volatility index is standardized using robust scaling (based on median and interquartile range) during preprocessing, consistent with the manuscript and Supplementary Materials.
 - Output: 
-  - Folder best_models_output/ containing 8 subfolders (one for each model). Each subfolder includes the model.pkl, scaler.pkl, selected_features.csv, and modeling_data.csv.
-  - all_models_summary_and_params.csv (Summary of R2, RMSE, MAE, and best hyperparameters).
+  - Folder best_models_output/ containing 8 subfolders. Each includes model.pkl, scaler.pkl, selected_features.csv, and modeling_data.csv.
+  - all_models_summary_and_params.csv
 
 STEP 3: MULTI-DIMENSIONAL VALIDATION (03_model_validation.py)
 -----------------------------------
-This script reproduces the 100 random splits (R2cv), 100-iteration Y-randomization, and cluster-based cross-validation.
+Reproduces: The fixed hold-out, repeated random-split, and structure-aware validation metrics.
 - Input File: input_data.xlsx
   Requirements: This table must contain the following exact columns:
   1. Dataset: Values must be labeled as "Train" or "Test".
   2. SMILES: SMILES strings (used for Morgan Fingerprints clustering).
   3. Actual: The experimental Fg values.
   4. The final descriptors: MID_h, Boiling point, Volatility index, MinPartialCharge, MATS1c, TPSA, BCUTp-1l, AATS2dv, ATS2dv.
-  Note: Note: Because STEP 3 performs validations on the trained models, the folders XGBoost/, RF/, and GBR/ (containing model.pkl and scaler.pkl generated from STEP 2) must be in the same directory as this script.
+- Note: This script evaluates the fixed descriptor sets selected beforehand (from STEP 2), rather than performing nested feature selection within each resampling fold. 
+- Requirement: The folders XGBoost/, RF/, and GBR/ (containing model.pkl and scaler.pkl generated from STEP 2) must be in the same directory as this script.
 - Output: 
   - Model_Validation_Results.xlsx (Contains 3 sheets: 100_Random_Splits, Y_Randomization, Cluster_CV).
 
@@ -115,5 +104,4 @@ MODEL SCOPE AND LIMITATIONS
 ========================================================================
 - Trained on 115 tobacco-derived SVOCs measured under a standardized ISO mainstream smoking regime.
 - Predictions represent the initial non-equilibrium phase distribution at the emission source, not aged indoor aerosols.
-- Applicability domain: The applicability domain analysis provides exploratory guidance, suggesting that predictions may be more appropriate for polar, heteroatom-containing compounds with TPSA > 10 A^2 and a standardized volatility index < 1.0. Independent validation is still required.
-- Use with caution for non-polar, highly volatile hydrocarbons.
+- Applicability domain: Provides exploratory guidance, suggesting predictions may be more appropriate for polar, heteroatom-containing compounds with TPSA > 10 A^2 and a standardized volatility index < 1.0. Independent validation is still required.
